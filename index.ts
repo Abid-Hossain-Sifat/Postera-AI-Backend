@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { authRouter } from "./auth";
+import { uploadRouter } from "./upload";
 
 
 dotenv.config();
@@ -24,6 +25,7 @@ const connectDB = async () => {
 app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRouter);
+app.use("/api/upload", uploadRouter);
 
 
 app.get("/", (req, res) => {
