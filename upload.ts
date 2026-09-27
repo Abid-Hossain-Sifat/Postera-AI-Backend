@@ -21,10 +21,11 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// Image Upload
-uploadRouter.post("/", upload.single("image"), async (req: Request, res: Response) => {
+// Image Upload (accepts 'file' or 'image' field)
+uploadRouter.post("/", upload.any(), async (req: Request, res: Response) => {
     try {
-        if (!req.file) {
+        const file = req.files && (req.files as Express.Multer.File[]).length > 0 ? (req.files as Express.Multer.File[])[0] : req.file;
+        if (!file) {
             return res.status(400).json({ message: "No image file provided" });
         }
 
@@ -43,7 +44,7 @@ uploadRouter.post("/", upload.single("image"), async (req: Request, res: Respons
             }
         );
 
-        stream.end(req.file.buffer);
+        stream.end(file.buffer);
     } catch (error: any) {
         res.status(500).json({ message: "Server error", error: error.message });
     }

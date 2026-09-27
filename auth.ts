@@ -38,7 +38,7 @@ authRouter.post("/register", async (req: Request, res: Response) => {
     // generate JWT token
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role },
-      process.env.JWT_SECRET as string,
+      process.env.JWT_SECRET || "fallback_secret",
       { expiresIn: "7d" }
     );
 
@@ -93,10 +93,6 @@ authRouter.post("/login", async (req: Request, res: Response) => {
   }
 });
 
-
-
-
-
 // verify JWT Token
 export const verifyToken = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -115,5 +111,19 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
+
+// GET /api/auth/me
+authRouter.get("/me", verifyToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.userId;
+    const user = await User.findById(userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
 
 
