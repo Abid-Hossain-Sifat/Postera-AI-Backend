@@ -26,21 +26,42 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
+let cachedDbPromise: Promise<typeof mongoose> | null = null;
+
 const connectDB = async () => {
-  try {
-    if (!MONGODB_URI) {
-      console.error("❌ MONGODB_URI is missing in environment variables!");
-      return;
-    }
-    await mongoose.connect(MONGODB_URI);
-    console.log("✅ DB Connected Successfully");
-  } catch (error) {
-    console.error("❌ DB Connect Failed:", error);
+  if (mongoose.connection.readyState === 1) return;
+  if (!MONGODB_URI) {
+    console.error("❌ MONGODB_URI is missing in environment variables!");
+    return;
   }
+  if (!cachedDbPromise) {
+    cachedDbPromise = mongoose.connect(MONGODB_URI).then((m) => {
+      console.log("✅ DB Connected Successfully");
+      return m;
+    }).catch((err) => {
+      cachedDbPromise = null;
+      console.error("❌ DB Connect Failed:", err);
+      throw err;
+    });
+  }
+  return cachedDbPromise;
 };
+
+// Initiate connection immediately
+connectDB().catch(() => {});
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+
+// Ensure DB is connected before processing requests (crucial for Vercel Serverless)
+app.use(async (_req, _res, next) => {
+  try {
+    await connectDB();
+  } catch (err) {
+    // Proceed to router so handlers can return detailed status if needed
+  }
+  next();
+});
 
 // Health Check
 app.get("/api/health", (_req, res) => {
@@ -63,7 +84,11 @@ app.get("/", (_req, res) => {
   res.send("🚀 AI Political Poster Maker Backend is running!");
 });
 
-app.listen(PORT, () => {
-  connectDB();
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+// Only start standalone HTTP server if not running inside Vercel serverless environment
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}
+
+export default app;
