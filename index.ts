@@ -1,8 +1,13 @@
 import dns from "node:dns";
-try {
-  dns.setServers(["8.8.8.8", "1.1.1.1"]);
-} catch (e) {
-  console.warn("DNS server configuration warning:", e);
+
+// Only override DNS servers in local development environments if needed, NOT on cloud hosts (Render/Vercel/Railway)
+const isCloud = !!(process.env.RENDER || process.env.VERCEL || process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === "production");
+if (!isCloud) {
+  try {
+    dns.setServers(["8.8.8.8", "1.1.1.1"]);
+  } catch (e) {
+    // Ignore DNS override warning in environments that disallow it
+  }
 }
 
 import express from "express";
@@ -23,15 +28,29 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(MONGODB_URI as string);
+    if (!MONGODB_URI) {
+      console.error("❌ MONGODB_URI is missing in environment variables!");
+      return;
+    }
+    await mongoose.connect(MONGODB_URI);
     console.log("✅ DB Connected Successfully");
   } catch (error) {
-    console.log("❌ DB Connect Failed:", error);
+    console.error("❌ DB Connect Failed:", error);
   }
 };
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+
+// Health Check
+app.get("/api/health", (_req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+  res.json({
+    status: "ok",
+    database: dbStatus,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Routes
 app.use("/api/auth", authRouter);

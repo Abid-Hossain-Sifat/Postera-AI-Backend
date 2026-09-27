@@ -1,6 +1,7 @@
 import express, { NextFunction, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import { User } from "./models";
 
 export const authRouter = express.Router();
@@ -12,6 +13,14 @@ const JWT_SECRET = process.env.JWT_SECRET;
 // Registration 
 authRouter.post("/register", async (req: Request, res: Response) => {
   try {
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error("❌ Registration failed: Database is not connected (readyState:", mongoose.connection.readyState, ")");
+      return res.status(503).json({
+        message: "ডাটাবেসের সাথে সংযোগ নেই (Database Disconnected)। MongoDB Atlas এ 0.0.0.0/0 হোয়াইটলিস্ট করা আছে কিনা চেক করুন।"
+      });
+    }
+
     const { name, email, password } = req.body;
 
     // check all fields
@@ -48,7 +57,11 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       user: { id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role },
     });
   } catch (error: any) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("❌ Registration Exception:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
+    res.status(500).json({ message: error.message || "Server error", error: error.message });
   }
 });
 
@@ -57,6 +70,14 @@ authRouter.post("/register", async (req: Request, res: Response) => {
 // Login
 authRouter.post("/login", async (req: Request, res: Response) => {
   try {
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error("❌ Login failed: Database is not connected (readyState:", mongoose.connection.readyState, ")");
+      return res.status(503).json({
+        message: "ডাটাবেসের সাথে সংযোগ নেই (Database Disconnected)। MongoDB Atlas এ 0.0.0.0/0 হোয়াইটলিস্ট করা আছে কিনা চেক করুন।"
+      });
+    }
+
     const { email, password } = req.body;
 
     // check fields
@@ -89,7 +110,8 @@ authRouter.post("/login", async (req: Request, res: Response) => {
       user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error: any) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("❌ Login Exception:", error);
+    res.status(500).json({ message: error.message || "Server error", error: error.message });
   }
 });
 
